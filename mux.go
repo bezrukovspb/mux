@@ -52,12 +52,17 @@ type Router struct {
 	// This has no effect when go1.7+ is used, since the context is stored
 	// on the request itself.
 	KeepContext bool
+	// Middlewares chain for a router.
+	Middlewares []func(h http.Handler) http.Handler
 }
 
 // Match matches registered routes against the request.
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.Match(req, match) {
+			for _, mw := range r.Middlewares {
+				match.Handler = mw(match.Handler)
+			}
 			return true
 		}
 	}
@@ -303,6 +308,22 @@ func (r *Router) walk(walkFn WalkFunc, ancestors []*Route) error {
 		}
 	}
 	return nil
+}
+
+// Use adds given middlewares to a router's middlewares chain.
+func (r *Router) Use(middlewares ...func(h http.Handler) http.Handler) *Router {
+	for _, m := range middlewares {
+		if len(r.Middlewares) == 0 {
+			r.Middlewares = append(r.Middlewares, m)
+			continue
+		}
+
+		mids := make([]func(h http.Handler) http.Handler, len(r.Middlewares)+1)
+		copy(mids[1:], r.Middlewares[0:])
+		mids[0] = m
+		r.Middlewares = mids
+	}
+	return r
 }
 
 // ----------------------------------------------------------------------------
