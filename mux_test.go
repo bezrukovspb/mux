@@ -1221,6 +1221,76 @@ func TestSubrouterErrorHandling(t *testing.T) {
 	}
 }
 
+func TestRouterMiddlewares(t *testing.T) {
+	var callsStack string
+
+	globalMiddleware := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callsStack += "G"
+			h.ServeHTTP(w, r)
+		})
+	}
+
+	middlewareA := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callsStack += "A"
+			h.ServeHTTP(w, r)
+		})
+	}
+
+	middlewareB := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callsStack += "B"
+			h.ServeHTTP(w, r)
+		})
+	}
+
+	requestHandlerFunc := func(w http.ResponseWriter, r *http.Request) {
+		callsStack += "R"
+		if _, ok := context.GetOk(r, "answer"); !ok {
+			t.Error("Answer must be in the context.")
+		}
+	}
+
+	router := NewRouter().Use(globalMiddleware)
+	router.Path("/use-global-middleware-only").HandlerFunc(requestHandlerFunc)
+
+	subRouter := router.PathPrefix("/use-a-b").Subrouter().Use(middlewareA, middlewareB)
+	subRouter.Path("/hello").HandlerFunc(requestHandlerFunc)
+
+	subSubRouter := subRouter.PathPrefix("/use-b-b-a-a").Subrouter().Use(middlewareB, middlewareB, middlewareA, middlewareA)
+	subSubRouter.Path("/hi").HandlerFunc(requestHandlerFunc)
+
+	req, _ := http.NewRequest("GET", "http://localhost/use-global-middleware-only", nil)
+	context.Set(req, "answer", 42)
+	router.ServeHTTP(NewRecorder(), req)
+
+	rightCallsStack := "GR"
+	if callsStack != rightCallsStack {
+		t.Errorf("The middlewares calls stack must be '%s', not '%s'", rightCallsStack, callsStack)
+	}
+
+	callsStack = ""
+	req, _ = http.NewRequest("GET", "http://localhost/use-a-b/hello", nil)
+	context.Set(req, "answer", 42)
+	router.ServeHTTP(NewRecorder(), req)
+
+	rightCallsStack = "GABR"
+	if callsStack != rightCallsStack {
+		t.Errorf("The middlewares calls stack must be '%s', not '%s'", rightCallsStack, callsStack)
+	}
+
+	callsStack = ""
+	req, _ = http.NewRequest("GET", "http://localhost/use-a-b/use-b-b-a-a/hi", nil)
+	context.Set(req, "answer", 42)
+	router.ServeHTTP(NewRecorder(), req)
+
+	rightCallsStack = "GABBBAAR"
+	if callsStack != rightCallsStack {
+		t.Errorf("The middlewares calls stack must be '%s', not '%s'", rightCallsStack, callsStack)
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
