@@ -1,7 +1,7 @@
 mux
 ===
-[![GoDoc](https://godoc.org/github.com/gorilla/mux?status.svg)](https://godoc.org/github.com/gorilla/mux)
-[![Build Status](https://travis-ci.org/gorilla/mux.svg?branch=master)](https://travis-ci.org/gorilla/mux)
+[![GoDoc](https://godoc.org/github.com/bezrukovspb/mux?status.svg)](https://godoc.org/github.com/bezrukovspb/mux)
+[![Build Status](https://travis-ci.org/bezrukovspb/mux.svg?branch=master)](https://travis-ci.org/bezrukovspb/mux)
 
 http://www.gorillatoolkit.org/pkg/mux
 
