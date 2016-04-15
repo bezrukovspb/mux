@@ -3,6 +3,46 @@ mux
 [![GoDoc](https://godoc.org/github.com/bezrukovspb/mux?status.svg)](https://godoc.org/github.com/bezrukovspb/mux)
 [![Build Status](https://travis-ci.org/bezrukovspb/mux.svg?branch=master)](https://travis-ci.org/bezrukovspb/mux)
 
+Main difference from original Gorilla mux is support of middlewares chains for a router and subrouters.
+
+```go
+globalMiddleware := func(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Some code here...
+		h.ServeHTTP(w, r)
+	})
+}
+
+middlewareA := func(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Some code here...
+		h.ServeHTTP(w, r)
+	})
+}
+
+middlewareB := func(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Some code here...
+		h.ServeHTTP(w, r)
+	})
+}
+
+requestHandlerFunc := func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Gorilla with middlewares chains!\n"))
+}
+
+router := NewRouter().Use(globalMiddleware)
+router.Path("/use-global-middleware-only").HandlerFunc(requestHandlerFunc)
+
+subRouter := router.PathPrefix("/use-a-b").Subrouter().Use(middlewareA, middlewareB)
+subRouter.Path("/hello").HandlerFunc(requestHandlerFunc)
+
+subSubRouter := subRouter.PathPrefix("/use-b-b-a-a").Subrouter().Use(middlewareB, middlewareB, middlewareA, middlewareA)
+subSubRouter.Path("/hi").HandlerFunc(requestHandlerFunc)
+
+```
+
+
 http://www.gorillatoolkit.org/pkg/mux
 
 Package `gorilla/mux` implements a request router and dispatcher.
