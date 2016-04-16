@@ -1240,6 +1240,15 @@ func TestRouterMiddlewares(t *testing.T) {
 
 	middlewareB := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			vars := Vars(r)
+			subdomain, ok := vars["subdomain"]
+			if !ok {
+				t.Error("subdomain isn't in vars.")
+			}
+			if subdomain != "mux" {
+				t.Errorf("subdomain must be 'mux', not '%s'", subdomain)
+			}
+
 			callsStack += "B"
 			h.ServeHTTP(w, r)
 		})
@@ -1247,15 +1256,19 @@ func TestRouterMiddlewares(t *testing.T) {
 
 	requestHandlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		callsStack += "R"
-		if _, ok := context.GetOk(r, "answer"); !ok {
+		answer, ok := context.GetOk(r, "answer")
+		if !ok {
 			t.Error("Answer must be in the context.")
+		}
+		if answer.(int) != 42 {
+			t.Errorf("Answer must be equals 42, not '%d'.", answer.(int))
 		}
 	}
 
 	router := NewRouter().Use(globalMiddleware)
 	router.Path("/use-global-middleware-only").HandlerFunc(requestHandlerFunc)
 
-	subRouter := router.PathPrefix("/use-a-b").Subrouter().Use(middlewareA, middlewareB)
+	subRouter := router.Host("{subdomain:[a-z]+?}.localhost").PathPrefix("/use-a-b").Subrouter().Use(middlewareA, middlewareB)
 	subRouter.Path("/hello").HandlerFunc(requestHandlerFunc)
 
 	subSubRouter := subRouter.PathPrefix("/use-b-b-a-a").Subrouter().Use(middlewareB, middlewareB, middlewareA, middlewareA)
@@ -1271,7 +1284,7 @@ func TestRouterMiddlewares(t *testing.T) {
 	}
 
 	callsStack = ""
-	req, _ = http.NewRequest("GET", "http://localhost/use-a-b/hello", nil)
+	req, _ = http.NewRequest("GET", "http://mux.localhost/use-a-b/hello", nil)
 	context.Set(req, "answer", 42)
 	router.ServeHTTP(NewRecorder(), req)
 
@@ -1281,7 +1294,7 @@ func TestRouterMiddlewares(t *testing.T) {
 	}
 
 	callsStack = ""
-	req, _ = http.NewRequest("GET", "http://localhost/use-a-b/use-b-b-a-a/hi", nil)
+	req, _ = http.NewRequest("GET", "http://mux.localhost/use-a-b/use-b-b-a-a/hi", nil)
 	context.Set(req, "answer", 42)
 	router.ServeHTTP(NewRecorder(), req)
 
